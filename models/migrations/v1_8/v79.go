@@ -4,22 +4,40 @@
 package v1_8 //nolint
 
 import (
-	"code.gitea.io/gitea/modules/setting"
+	"code.gitea.io/gitea/models/migrations/base"
 
 	"xorm.io/xorm"
 )
 
-func AddCanCloseIssuesViaCommitInAnyBranch(x *xorm.Engine) error {
+func RenameRepoIsBareToIsEmpty(x *xorm.Engine) error {
 	type Repository struct {
-		ID                              int64 `xorm:"pk autoincr"`
-		CloseIssuesViaCommitInAnyBranch bool  `xorm:"NOT NULL DEFAULT false"`
+		ID      int64 `xorm:"pk autoincr"`
+		IsBare  bool
+		IsEmpty bool `xorm:"INDEX"`
 	}
 
-	if err := x.Sync2(new(Repository)); err != nil {
+	sess := x.NewSession()
+	defer sess.Close()
+	if err := sess.Begin(); err != nil {
 		return err
 	}
 
-	_, err := x.Exec("UPDATE repository SET close_issues_via_commit_in_any_branch = ?",
-		setting.Repository.DefaultCloseIssuesViaCommitsInAnyBranch)
-	return err
+	if err := sess.Sync2(new(Repository)); err != nil {
+		return err
+	}
+	if _, err := sess.Exec("UPDATE repository SET is_empty = is_bare;"); err != nil {
+		return err
+	}
+	if err := sess.Commit(); err != nil {
+		return err
+	}
+
+	if err := sess.Begin(); err != nil {
+		return err
+	}
+	if err := base.DropTableColumns(sess, "repository", "is_bare"); err != nil {
+		return err
+	}
+
+	return sess.Commit()
 }

@@ -4,25 +4,14 @@
 package v1_15 //nolint
 
 import (
-	"code.gitea.io/gitea/models/migrations/base"
-
 	"xorm.io/xorm"
-	"xorm.io/xorm/schemas"
 )
 
-func ConvertAvatarURLToText(x *xorm.Engine) error {
-	dbType := x.Dialect().URI().DBType
-	if dbType == schemas.SQLITE { // For SQLITE, varchar or char will always be represented as TEXT
-		return nil
+func AddLFSMirrorColumns(x *xorm.Engine) error {
+	type Mirror struct {
+		LFS         bool   `xorm:"lfs_enabled NOT NULL DEFAULT false"`
+		LFSEndpoint string `xorm:"lfs_endpoint TEXT"`
 	}
 
-	// Some oauth2 providers may give very long avatar urls (i.e. Google)
-	return base.ModifyColumn(x, "external_login_user", &schemas.Column{
-		Name: "avatar_url",
-		SQLType: schemas.SQLType{
-			Name: schemas.Text,
-		},
-		Nullable:       true,
-		DefaultIsEmpty: true,
-	})
+	return x.Sync2(new(Mirror))
 }

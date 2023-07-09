@@ -4,16 +4,18 @@
 package v1_16 //nolint
 
 import (
+	"fmt"
+
 	"xorm.io/xorm"
 )
 
-func AddRenamedBranchTable(x *xorm.Engine) error {
-	type RenamedBranch struct {
-		ID          int64 `xorm:"pk autoincr"`
-		RepoID      int64 `xorm:"INDEX NOT NULL"`
-		From        string
-		To          string
-		CreatedUnix int64 `xorm:"created"`
+func AddColorColToProjectBoard(x *xorm.Engine) error {
+	type ProjectBoard struct {
+		Color string `xorm:"VARCHAR(7)"`
 	}
-	return x.Sync2(new(RenamedBranch))
+
+	if err := x.Sync2(new(ProjectBoard)); err != nil {
+		return fmt.Errorf("Sync2: %w", err)
+	}
+	return nil
 }

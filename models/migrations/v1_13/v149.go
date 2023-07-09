@@ -4,21 +4,10 @@
 package v1_13 //nolint
 
 import (
-	"fmt"
-
-	"code.gitea.io/gitea/modules/timeutil"
-
 	"xorm.io/xorm"
 )
 
-func AddCreatedAndUpdatedToMilestones(x *xorm.Engine) error {
-	type Milestone struct {
-		CreatedUnix timeutil.TimeStamp `xorm:"INDEX created"`
-		UpdatedUnix timeutil.TimeStamp `xorm:"INDEX updated"`
-	}
-
-	if err := x.Sync2(new(Milestone)); err != nil {
-		return fmt.Errorf("Sync2: %w", err)
-	}
-	return nil
+func PurgeInvalidDependenciesComments(x *xorm.Engine) error {
+	_, err := x.Exec("DELETE FROM comment WHERE dependent_issue_id != 0 AND dependent_issue_id NOT IN (SELECT id FROM issue)")
+	return err
 }

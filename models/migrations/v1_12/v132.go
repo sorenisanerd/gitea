@@ -9,12 +9,12 @@ import (
 	"xorm.io/xorm"
 )
 
-func AddBranchProtectionProtectedFilesColumn(x *xorm.Engine) error {
-	type ProtectedBranch struct {
-		ProtectedFilePatterns string `xorm:"TEXT"`
+func AddSystemWebhookColumn(x *xorm.Engine) error {
+	type Webhook struct {
+		IsSystemWebhook bool `xorm:"NOT NULL DEFAULT false"`
 	}
 
-	if err := x.Sync2(new(ProtectedBranch)); err != nil {
+	if err := x.Sync2(new(Webhook)); err != nil {
 		return fmt.Errorf("Sync2: %w", err)
 	}
 	return nil

@@ -4,22 +4,15 @@
 package v1_19 //nolint
 
 import (
-	"code.gitea.io/gitea/modules/setting"
-
 	"xorm.io/xorm"
 )
 
-func AlterPackageVersionMetadataToLongText(x *xorm.Engine) error {
-	sess := x.NewSession()
-	defer sess.Close()
-	if err := sess.Begin(); err != nil {
-		return err
+func AddIndexForHookTask(x *xorm.Engine) error {
+	type HookTask struct {
+		ID     int64  `xorm:"pk autoincr"`
+		HookID int64  `xorm:"index"`
+		UUID   string `xorm:"unique"`
 	}
 
-	if setting.Database.Type.IsMySQL() {
-		if _, err := sess.Exec("ALTER TABLE `package_version` MODIFY COLUMN `metadata_json` LONGTEXT"); err != nil {
-			return err
-		}
-	}
-	return sess.Commit()
+	return x.Sync(new(HookTask))
 }

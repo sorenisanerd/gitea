@@ -4,19 +4,20 @@
 package v1_12 //nolint
 
 import (
-	"fmt"
-
 	"xorm.io/xorm"
 )
 
-func AddReviewMigrateInfo(x *xorm.Engine) error {
-	type Review struct {
-		OriginalAuthor   string
-		OriginalAuthorID int64
+func AddUserRepoMissingColumns(x *xorm.Engine) error {
+	type VisibleType int
+	type User struct {
+		PasswdHashAlgo string      `xorm:"NOT NULL DEFAULT 'pbkdf2'"`
+		Visibility     VisibleType `xorm:"NOT NULL DEFAULT 0"`
 	}
 
-	if err := x.Sync2(new(Review)); err != nil {
-		return fmt.Errorf("Sync2: %w", err)
+	type Repository struct {
+		IsArchived bool     `xorm:"INDEX"`
+		Topics     []string `xorm:"TEXT JSON"`
 	}
-	return nil
+
+	return x.Sync2(new(User), new(Repository))
 }

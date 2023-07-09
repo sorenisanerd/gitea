@@ -4,6 +4,7 @@
 package v1_15 //nolint
 
 import (
+	"strings"
 	"testing"
 
 	"code.gitea.io/gitea/models/migrations/base"
@@ -11,50 +12,44 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_AddIssueResourceIndexTable(t *testing.T) {
-	// Create the models used in the migration
-	type Issue struct {
-		ID     int64 `xorm:"pk autoincr"`
-		RepoID int64 `xorm:"UNIQUE(s)"`
-		Index  int64 `xorm:"UNIQUE(s)"`
+func Test_AddPrimaryEmail2EmailAddress(t *testing.T) {
+	type User struct {
+		ID       int64
+		Email    string
+		IsActive bool
 	}
 
 	// Prepare and load the testing database
-	x, deferable := base.PrepareTestEnv(t, 0, new(Issue))
+	x, deferable := base.PrepareTestEnv(t, 0, new(User))
 	if x == nil || t.Failed() {
 		defer deferable()
 		return
 	}
 	defer deferable()
 
-	// Run the migration
-	if err := AddIssueResourceIndexTable(x); err != nil {
-		assert.NoError(t, err)
-		return
+	err := AddPrimaryEmail2EmailAddress(x)
+	assert.NoError(t, err)
+
+	type EmailAddress struct {
+		ID          int64  `xorm:"pk autoincr"`
+		UID         int64  `xorm:"INDEX NOT NULL"`
+		Email       string `xorm:"UNIQUE NOT NULL"`
+		LowerEmail  string `xorm:"UNIQUE NOT NULL"`
+		IsActivated bool
+		IsPrimary   bool `xorm:"DEFAULT(false) NOT NULL"`
 	}
 
-	type ResourceIndex struct {
-		GroupID  int64 `xorm:"pk"`
-		MaxIndex int64 `xorm:"index"`
-	}
+	users := make([]User, 0, 20)
+	err = x.Find(&users)
+	assert.NoError(t, err)
 
-	start := 0
-	const batchSize = 1000
-	for {
-		indexes := make([]ResourceIndex, 0, batchSize)
-		err := x.Table("issue_index").Limit(batchSize, start).Find(&indexes)
+	for _, user := range users {
+		var emailAddress EmailAddress
+		has, err := x.Where("lower_email=?", strings.ToLower(user.Email)).Get(&emailAddress)
 		assert.NoError(t, err)
-
-		for _, idx := range indexes {
-			var maxIndex int
-			has, err := x.SQL("SELECT max(`index`) FROM issue WHERE repo_id = ?", idx.GroupID).Get(&maxIndex)
-			assert.NoError(t, err)
-			assert.True(t, has)
-			assert.EqualValues(t, maxIndex, idx.MaxIndex)
-		}
-		if len(indexes) < batchSize {
-			break
-		}
-		start += len(indexes)
+		assert.True(t, has)
+		assert.True(t, emailAddress.IsPrimary)
+		assert.EqualValues(t, user.IsActive, emailAddress.IsActivated)
+		assert.EqualValues(t, user.ID, emailAddress.UID)
 	}
 }

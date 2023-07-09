@@ -5,17 +5,19 @@ package v1_14 //nolint
 
 import (
 	"fmt"
-	"regexp"
-
-	"code.gitea.io/gitea/modules/log"
-	"code.gitea.io/gitea/modules/setting"
 
 	"xorm.io/xorm"
 )
 
-func FixPostgresIDSequences(x *xorm.Engine) error {
-	if !setting.Database.Type.IsPostgreSQL() {
-		return nil
+func AddRepoTransfer(x *xorm.Engine) error {
+	type RepoTransfer struct {
+		ID          int64 `xorm:"pk autoincr"`
+		DoerID      int64
+		RecipientID int64
+		RepoID      int64
+		TeamIDs     []int64
+		CreatedUnix int64 `xorm:"INDEX NOT NULL created"`
+		UpdatedUnix int64 `xorm:"INDEX NOT NULL updated"`
 	}
 
 	sess := x.NewSession()
@@ -24,29 +26,8 @@ func FixPostgresIDSequences(x *xorm.Engine) error {
 		return err
 	}
 
-	var sequences []string
-	schema := sess.Engine().Dialect().URI().Schema
-
-	sess.Engine().SetSchema("")
-	if err := sess.Table("information_schema.sequences").Cols("sequence_name").Where("sequence_name LIKE 'tmp_recreate__%_id_seq%' AND sequence_catalog = ?", setting.Database.Name).Find(&sequences); err != nil {
-		log.Error("Unable to find sequences: %v", err)
-		return err
-	}
-	sess.Engine().SetSchema(schema)
-
-	sequenceRegexp := regexp.MustCompile(`tmp_recreate__(\w+)_id_seq.*`)
-
-	for _, sequence := range sequences {
-		tableName := sequenceRegexp.FindStringSubmatch(sequence)[1]
-		newSequenceName := tableName + "_id_seq"
-		if _, err := sess.Exec(fmt.Sprintf("ALTER SEQUENCE `%s` RENAME TO `%s`", sequence, newSequenceName)); err != nil {
-			log.Error("Unable to rename %s to %s. Error: %v", sequence, newSequenceName, err)
-			return err
-		}
-		if _, err := sess.Exec(fmt.Sprintf("SELECT setval('%s', COALESCE((SELECT MAX(id)+1 FROM `%s`), 1), false)", newSequenceName, tableName)); err != nil {
-			log.Error("Unable to reset sequence %s for %s. Error: %v", newSequenceName, tableName, err)
-			return err
-		}
+	if err := sess.Sync2(new(RepoTransfer)); err != nil {
+		return fmt.Errorf("Sync2: %w", err)
 	}
 
 	return sess.Commit()

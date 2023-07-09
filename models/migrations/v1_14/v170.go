@@ -4,18 +4,10 @@
 package v1_14 //nolint
 
 import (
-	"fmt"
-
 	"xorm.io/xorm"
 )
 
-func AddDismissedReviewColumn(x *xorm.Engine) error {
-	type Review struct {
-		Dismissed bool `xorm:"NOT NULL DEFAULT false"`
-	}
-
-	if err := x.Sync2(new(Review)); err != nil {
-		return fmt.Errorf("Sync2: %w", err)
-	}
-	return nil
+func CommentTypeDeleteBranchUseOldRef(x *xorm.Engine) error {
+	_, err := x.Exec("UPDATE comment SET old_ref = commit_sha, commit_sha = '' WHERE type = 11")
+	return err
 }

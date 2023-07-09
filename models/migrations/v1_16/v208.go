@@ -7,7 +7,8 @@ import (
 	"xorm.io/xorm"
 )
 
-func UseBase32HexForCredIDInWebAuthnCredential(x *xorm.Engine) error {
-	// noop
+func AddWebAuthnCred(x *xorm.Engine) error {
+	// NO-OP Don't migrate here - let v210 do this.
+
 	return nil
 }

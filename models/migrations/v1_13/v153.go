@@ -3,22 +3,11 @@
 
 package v1_13 //nolint
 
-import (
-	"xorm.io/xorm"
-)
+import "xorm.io/xorm"
 
-func AddTeamReviewRequestSupport(x *xorm.Engine) error {
-	type Review struct {
-		ReviewerTeamID int64 `xorm:"NOT NULL DEFAULT 0"`
+func AddTrustModelToRepository(x *xorm.Engine) error {
+	type Repository struct {
+		TrustModel int
 	}
-
-	type Comment struct {
-		AssigneeTeamID int64 `xorm:"NOT NULL DEFAULT 0"`
-	}
-
-	if err := x.Sync2(new(Review)); err != nil {
-		return err
-	}
-
-	return x.Sync2(new(Comment))
+	return x.Sync2(new(Repository))
 }

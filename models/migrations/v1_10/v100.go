@@ -4,79 +4,35 @@
 package v1_10 //nolint
 
 import (
-	"net/url"
-	"strings"
-	"time"
+	"code.gitea.io/gitea/modules/timeutil"
 
 	"xorm.io/xorm"
 )
 
-func UpdateMigrationServiceTypes(x *xorm.Engine) error {
+func AddTaskTable(x *xorm.Engine) error {
+	// TaskType defines task type
+	type TaskType int
+
+	// TaskStatus defines task status
+	type TaskStatus int
+
+	type Task struct {
+		ID             int64
+		DoerID         int64 `xorm:"index"` // operator
+		OwnerID        int64 `xorm:"index"` // repo owner id, when creating, the repoID maybe zero
+		RepoID         int64 `xorm:"index"`
+		Type           TaskType
+		Status         TaskStatus `xorm:"index"`
+		StartTime      timeutil.TimeStamp
+		EndTime        timeutil.TimeStamp
+		PayloadContent string             `xorm:"TEXT"`
+		Errors         string             `xorm:"TEXT"` // if task failed, saved the error reason
+		Created        timeutil.TimeStamp `xorm:"created"`
+	}
+
 	type Repository struct {
-		ID                  int64
-		OriginalServiceType int    `xorm:"index default(0)"`
-		OriginalURL         string `xorm:"VARCHAR(2048)"`
+		Status int `xorm:"NOT NULL DEFAULT 0"`
 	}
 
-	if err := x.Sync2(new(Repository)); err != nil {
-		return err
-	}
-
-	var last int
-	const batchSize = 50
-	for {
-		results := make([]Repository, 0, batchSize)
-		err := x.Where("original_url <> '' AND original_url IS NOT NULL").
-			And("original_service_type = 0 OR original_service_type IS NULL").
-			OrderBy("id").
-			Limit(batchSize, last).
-			Find(&results)
-		if err != nil {
-			return err
-		}
-		if len(results) == 0 {
-			break
-		}
-		last += len(results)
-
-		const PlainGitService = 1 // 1 plain git service
-		const GithubService = 2   // 2 github.com
-
-		for _, res := range results {
-			u, err := url.Parse(res.OriginalURL)
-			if err != nil {
-				return err
-			}
-			serviceType := PlainGitService
-			if strings.EqualFold(u.Host, "github.com") {
-				serviceType = GithubService
-			}
-			_, err = x.Exec("UPDATE repository SET original_service_type = ? WHERE id = ?", serviceType, res.ID)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	type ExternalLoginUser struct {
-		ExternalID        string                 `xorm:"pk NOT NULL"`
-		UserID            int64                  `xorm:"INDEX NOT NULL"`
-		LoginSourceID     int64                  `xorm:"pk NOT NULL"`
-		RawData           map[string]interface{} `xorm:"TEXT JSON"`
-		Provider          string                 `xorm:"index VARCHAR(25)"`
-		Email             string
-		Name              string
-		FirstName         string
-		LastName          string
-		NickName          string
-		Description       string
-		AvatarURL         string
-		Location          string
-		AccessToken       string
-		AccessTokenSecret string
-		RefreshToken      string
-		ExpiresAt         time.Time
-	}
-
-	return x.Sync2(new(ExternalLoginUser))
+	return x.Sync2(new(Task), new(Repository))
 }

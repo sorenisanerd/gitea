@@ -1,4 +1,4 @@
-// Copyright 2020 The Gitea Authors. All rights reserved.
+// Copyright 2019 The Gitea Authors. All rights reserved.
 // SPDX-License-Identifier: MIT
 
 package v1_12 //nolint
@@ -7,9 +7,19 @@ import (
 	"xorm.io/xorm"
 )
 
-func FixMigratedRepositoryServiceType(x *xorm.Engine) error {
-	// structs.GithubService:
-	// GithubService = 2
-	_, err := x.Exec("UPDATE repository SET original_service_type = ? WHERE original_url LIKE 'https://github.com/%'", 2)
-	return err
+func AddReviewCommitAndStale(x *xorm.Engine) error {
+	type Review struct {
+		CommitID string `xorm:"VARCHAR(40)"`
+		Stale    bool   `xorm:"NOT NULL DEFAULT false"`
+	}
+
+	type ProtectedBranch struct {
+		DismissStaleApprovals bool `xorm:"NOT NULL DEFAULT false"`
+	}
+
+	// Old reviews will have commit ID set to "" and not stale
+	if err := x.Sync2(new(Review)); err != nil {
+		return err
+	}
+	return x.Sync2(new(ProtectedBranch))
 }

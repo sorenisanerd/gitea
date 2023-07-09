@@ -7,13 +7,9 @@ import (
 	"xorm.io/xorm"
 )
 
-func AddOwnerNameOnRepository(x *xorm.Engine) error {
-	type Repository struct {
-		OwnerName string
-	}
-	if err := x.Sync2(new(Repository)); err != nil {
-		return err
-	}
-	_, err := x.Exec("UPDATE repository SET owner_name = (SELECT name FROM `user` WHERE `user`.id = repository.owner_id)")
+func FixMigratedRepositoryServiceType(x *xorm.Engine) error {
+	// structs.GithubService:
+	// GithubService = 2
+	_, err := x.Exec("UPDATE repository SET original_service_type = ? WHERE original_url LIKE 'https://github.com/%'", 2)
 	return err
 }

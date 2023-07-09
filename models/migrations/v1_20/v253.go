@@ -9,23 +9,21 @@ import (
 	"xorm.io/xorm"
 )
 
-func FixExternalTrackerAndExternalWikiAccessModeInOwnerAndAdminTeam(x *xorm.Engine) error {
+func FixIncorrectAdminTeamUnitAccessMode(x *xorm.Engine) error {
 	type UnitType int
 	type AccessMode int
 
 	type TeamUnit struct {
 		ID         int64    `xorm:"pk autoincr"`
+		OrgID      int64    `xorm:"INDEX"`
+		TeamID     int64    `xorm:"UNIQUE(s)"`
 		Type       UnitType `xorm:"UNIQUE(s)"`
 		AccessMode AccessMode
 	}
 
 	const (
-		// AccessModeRead read access
-		AccessModeRead = 1
-
-		// Unit Type
-		TypeExternalWiki    = 6
-		TypeExternalTracker = 7
+		// AccessModeAdmin admin access
+		AccessModeAdmin = 3
 	)
 
 	sess := x.NewSession()
@@ -36,14 +34,14 @@ func FixExternalTrackerAndExternalWikiAccessModeInOwnerAndAdminTeam(x *xorm.Engi
 	}
 
 	count, err := sess.Table("team_unit").
-		Where("type IN (?, ?) AND access_mode > ?", TypeExternalWiki, TypeExternalTracker, AccessModeRead).
+		Where("team_id IN (SELECT id FROM team WHERE authorize = ?)", AccessModeAdmin).
 		Update(&TeamUnit{
-			AccessMode: AccessModeRead,
+			AccessMode: AccessModeAdmin,
 		})
 	if err != nil {
 		return err
 	}
-	log.Debug("Updated %d ExternalTracker and ExternalWiki access mode to belong to owner and admin", count)
+	log.Debug("Updated %d admin team unit access mode to belong to admin instead of none", count)
 
 	return sess.Commit()
 }

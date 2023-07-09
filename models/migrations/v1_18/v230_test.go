@@ -6,42 +6,41 @@ package v1_18 //nolint
 import (
 	"testing"
 
+	"code.gitea.io/gitea/models/issues"
 	"code.gitea.io/gitea/models/migrations/base"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_AddConfidentialClientColumnToOAuth2ApplicationTable(t *testing.T) {
-	// premigration
-	type OAuth2Application struct {
-		ID int64
-	}
+func Test_UpdateOpenMilestoneCounts(t *testing.T) {
+	type ExpectedMilestone issues.Milestone
 
 	// Prepare and load the testing database
-	x, deferable := base.PrepareTestEnv(t, 0, new(OAuth2Application))
+	x, deferable := base.PrepareTestEnv(t, 0, new(issues.Milestone), new(ExpectedMilestone), new(issues.Issue))
 	defer deferable()
 	if x == nil || t.Failed() {
 		return
 	}
 
-	if err := AddConfidentialClientColumnToOAuth2ApplicationTable(x); err != nil {
+	if err := UpdateOpenMilestoneCounts(x); err != nil {
 		assert.NoError(t, err)
 		return
 	}
 
-	// postmigration
-	type ExpectedOAuth2Application struct {
-		ID                 int64
-		ConfidentialClient bool
-	}
-
-	got := []ExpectedOAuth2Application{}
-	if err := x.Table("o_auth2_application").Select("id, confidential_client").Find(&got); !assert.NoError(t, err) {
+	expected := []ExpectedMilestone{}
+	if err := x.Table("expected_milestone").Asc("id").Find(&expected); !assert.NoError(t, err) {
 		return
 	}
 
-	assert.NotEmpty(t, got)
-	for _, e := range got {
-		assert.True(t, e.ConfidentialClient)
+	got := []issues.Milestone{}
+	if err := x.Table("milestone").Asc("id").Find(&got); !assert.NoError(t, err) {
+		return
+	}
+
+	for i, e := range expected {
+		got := got[i]
+		assert.Equal(t, e.ID, got.ID)
+		assert.Equal(t, e.NumIssues, got.NumIssues)
+		assert.Equal(t, e.NumClosedIssues, got.NumClosedIssues)
 	}
 }

@@ -7,10 +7,11 @@ import (
 	"xorm.io/xorm"
 )
 
-func AddCanCreateOrgRepoColumnForTeam(x *xorm.Engine) error {
-	type Team struct {
-		CanCreateOrgRepo bool `xorm:"NOT NULL DEFAULT false"`
+func AddCommentIDOnNotification(x *xorm.Engine) error {
+	type Notification struct {
+		ID        int64 `xorm:"pk autoincr"`
+		CommentID int64
 	}
 
-	return x.Sync2(new(Team))
+	return x.Sync2(new(Notification))
 }

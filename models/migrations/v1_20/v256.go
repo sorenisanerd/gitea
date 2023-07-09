@@ -4,20 +4,20 @@
 package v1_20 //nolint
 
 import (
+	"code.gitea.io/gitea/modules/timeutil"
+
 	"xorm.io/xorm"
 )
 
-func AddIsInternalColumnToPackage(x *xorm.Engine) error {
-	type Package struct {
-		ID               int64  `xorm:"pk autoincr"`
-		OwnerID          int64  `xorm:"UNIQUE(s) INDEX NOT NULL"`
-		RepoID           int64  `xorm:"INDEX"`
-		Type             string `xorm:"UNIQUE(s) INDEX NOT NULL"`
-		Name             string `xorm:"NOT NULL"`
-		LowerName        string `xorm:"UNIQUE(s) INDEX NOT NULL"`
-		SemverCompatible bool   `xorm:"NOT NULL DEFAULT false"`
-		IsInternal       bool   `xorm:"NOT NULL DEFAULT false"`
+func AddArchivedUnixToRepository(x *xorm.Engine) error {
+	type Repository struct {
+		ArchivedUnix timeutil.TimeStamp `xorm:"DEFAULT 0"`
 	}
 
-	return x.Sync(new(Package))
+	if err := x.Sync(new(Repository)); err != nil {
+		return err
+	}
+
+	_, err := x.Exec("UPDATE repository SET archived_unix = updated_unix WHERE is_archived = ? AND archived_unix = 0", true)
+	return err
 }

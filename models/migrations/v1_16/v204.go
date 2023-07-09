@@ -3,12 +3,15 @@
 
 package v1_16 //nolint
 
-import "xorm.io/xorm"
+import (
+	"xorm.io/xorm"
+)
 
-func AddSSHKeyIsVerified(x *xorm.Engine) error {
-	type PublicKey struct {
-		Verified bool `xorm:"NOT NULL DEFAULT false"`
+func AddProjectIssueSorting(x *xorm.Engine) error {
+	// ProjectIssue saves relation from issue to a project
+	type ProjectIssue struct {
+		Sorting int64 `xorm:"NOT NULL DEFAULT 0"`
 	}
 
-	return x.Sync2(new(PublicKey))
+	return x.Sync2(new(ProjectIssue))
 }

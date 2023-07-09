@@ -4,25 +4,20 @@
 package v1_16 //nolint
 
 import (
-	"code.gitea.io/gitea/modules/setting"
+	"fmt"
 
 	"xorm.io/xorm"
 )
 
-func AlterIssueAndCommentTextFieldsToLongText(x *xorm.Engine) error {
-	sess := x.NewSession()
-	defer sess.Close()
-	if err := sess.Begin(); err != nil {
-		return err
+func AddAgitFlowPullRequest(x *xorm.Engine) error {
+	type PullRequestFlow int
+
+	type PullRequest struct {
+		Flow PullRequestFlow `xorm:"NOT NULL DEFAULT 0"`
 	}
 
-	if setting.Database.Type.IsMySQL() {
-		if _, err := sess.Exec("ALTER TABLE `issue` CHANGE `content` `content` LONGTEXT"); err != nil {
-			return err
-		}
-		if _, err := sess.Exec("ALTER TABLE `comment` CHANGE `content` `content` LONGTEXT, CHANGE `patch` `patch` LONGTEXT"); err != nil {
-			return err
-		}
+	if err := x.Sync2(new(PullRequest)); err != nil {
+		return fmt.Errorf("sync2: %w", err)
 	}
-	return sess.Commit()
+	return nil
 }

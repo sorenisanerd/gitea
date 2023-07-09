@@ -7,11 +7,10 @@ import (
 	"xorm.io/xorm"
 )
 
-func AddReactionOriginals(x *xorm.Engine) error {
-	type Reaction struct {
-		OriginalAuthorID int64 `xorm:"INDEX NOT NULL DEFAULT(0)"`
-		OriginalAuthor   string
+func AddRequireSignedCommits(x *xorm.Engine) error {
+	type ProtectedBranch struct {
+		RequireSignedCommits bool `xorm:"NOT NULL DEFAULT false"`
 	}
 
-	return x.Sync2(new(Reaction))
+	return x.Sync2(new(ProtectedBranch))
 }

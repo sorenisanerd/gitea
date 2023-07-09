@@ -3,13 +3,19 @@
 
 package v1_12 //nolint
 
-import "xorm.io/xorm"
+import (
+	"fmt"
 
-func AddEmailHashTable(x *xorm.Engine) error {
-	// EmailHash represents a pre-generated hash map
-	type EmailHash struct {
-		Hash  string `xorm:"pk varchar(32)"`
-		Email string `xorm:"UNIQUE NOT NULL"`
+	"xorm.io/xorm"
+)
+
+func AddBranchProtectionProtectedFilesColumn(x *xorm.Engine) error {
+	type ProtectedBranch struct {
+		ProtectedFilePatterns string `xorm:"TEXT"`
 	}
-	return x.Sync2(new(EmailHash))
+
+	if err := x.Sync2(new(ProtectedBranch)); err != nil {
+		return fmt.Errorf("Sync2: %w", err)
+	}
+	return nil
 }

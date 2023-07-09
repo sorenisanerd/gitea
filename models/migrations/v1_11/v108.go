@@ -7,11 +7,11 @@ import (
 	"xorm.io/xorm"
 )
 
-func AddCommentIDOnNotification(x *xorm.Engine) error {
-	type Notification struct {
-		ID        int64 `xorm:"pk autoincr"`
-		CommentID int64
+func AddTemplateToRepo(x *xorm.Engine) error {
+	type Repository struct {
+		IsTemplate bool  `xorm:"INDEX NOT NULL DEFAULT false"`
+		TemplateID int64 `xorm:"INDEX"`
 	}
 
-	return x.Sync2(new(Notification))
+	return x.Sync2(new(Repository))
 }

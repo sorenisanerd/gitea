@@ -7,16 +7,11 @@ import (
 	"xorm.io/xorm"
 )
 
-func AddAutoMergeTable(x *xorm.Engine) error {
-	type MergeStyle string
-	type PullAutoMerge struct {
-		ID          int64      `xorm:"pk autoincr"`
-		PullID      int64      `xorm:"UNIQUE"`
-		DoerID      int64      `xorm:"NOT NULL"`
-		MergeStyle  MergeStyle `xorm:"varchar(30)"`
-		Message     string     `xorm:"LONGTEXT"`
-		CreatedUnix int64      `xorm:"created"`
+func AddAllowMaintainerEdit(x *xorm.Engine) error {
+	// PullRequest represents relation between pull request and repositories.
+	type PullRequest struct {
+		AllowMaintainerEdit bool `xorm:"NOT NULL DEFAULT false"`
 	}
 
-	return x.Sync2(&PullAutoMerge{})
+	return x.Sync2(new(PullRequest))
 }

@@ -4,21 +4,18 @@
 package v1_13 //nolint
 
 import (
-	"code.gitea.io/gitea/modules/log"
+	"fmt"
 
-	"xorm.io/builder"
 	"xorm.io/xorm"
 )
 
-func SetIsArchivedToFalse(x *xorm.Engine) error {
-	type Repository struct {
-		IsArchived bool `xorm:"INDEX"`
+func AddKeepActivityPrivateUserColumn(x *xorm.Engine) error {
+	type User struct {
+		KeepActivityPrivate bool `xorm:"NOT NULL DEFAULT false"`
 	}
-	count, err := x.Where(builder.IsNull{"is_archived"}).Cols("is_archived").Update(&Repository{
-		IsArchived: false,
-	})
-	if err == nil {
-		log.Debug("Updated %d repositories with is_archived IS NULL", count)
+
+	if err := x.Sync2(new(User)); err != nil {
+		return fmt.Errorf("Sync2: %w", err)
 	}
-	return err
+	return nil
 }

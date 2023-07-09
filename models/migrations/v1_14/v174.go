@@ -9,26 +9,13 @@ import (
 	"xorm.io/xorm"
 )
 
-func AddRepoTransfer(x *xorm.Engine) error {
-	type RepoTransfer struct {
-		ID          int64 `xorm:"pk autoincr"`
-		DoerID      int64
-		RecipientID int64
-		RepoID      int64
-		TeamIDs     []int64
-		CreatedUnix int64 `xorm:"INDEX NOT NULL created"`
-		UpdatedUnix int64 `xorm:"INDEX NOT NULL updated"`
+func AddTimeIDCommentColumn(x *xorm.Engine) error {
+	type Comment struct {
+		TimeID int64
 	}
 
-	sess := x.NewSession()
-	defer sess.Close()
-	if err := sess.Begin(); err != nil {
-		return err
-	}
-
-	if err := sess.Sync2(new(RepoTransfer)); err != nil {
+	if err := x.Sync2(new(Comment)); err != nil {
 		return fmt.Errorf("Sync2: %w", err)
 	}
-
-	return sess.Commit()
+	return nil
 }

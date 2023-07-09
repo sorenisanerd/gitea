@@ -4,89 +4,118 @@
 package v1_15 //nolint
 
 import (
-	"strings"
+	"code.gitea.io/gitea/modules/json"
+	"code.gitea.io/gitea/modules/util"
 
+	"xorm.io/builder"
 	"xorm.io/xorm"
 )
 
-func AddPrimaryEmail2EmailAddress(x *xorm.Engine) (err error) {
-	type User struct {
-		ID       int64  `xorm:"pk autoincr"`
-		Email    string `xorm:"NOT NULL"`
-		IsActive bool   `xorm:"INDEX"` // Activate primary email
+func DeleteMigrationCredentials(x *xorm.Engine) (err error) {
+	// Task represents a task
+	type Task struct {
+		ID             int64
+		DoerID         int64 `xorm:"index"` // operator
+		OwnerID        int64 `xorm:"index"` // repo owner id, when creating, the repoID maybe zero
+		RepoID         int64 `xorm:"index"`
+		Type           int
+		Status         int `xorm:"index"`
+		StartTime      int64
+		EndTime        int64
+		PayloadContent string `xorm:"TEXT"`
+		Errors         string `xorm:"TEXT"` // if task failed, saved the error reason
+		Created        int64  `xorm:"created"`
 	}
 
-	type EmailAddress1 struct {
-		ID          int64  `xorm:"pk autoincr"`
-		UID         int64  `xorm:"INDEX NOT NULL"`
-		Email       string `xorm:"UNIQUE NOT NULL"`
-		LowerEmail  string
-		IsActivated bool
-		IsPrimary   bool `xorm:"DEFAULT(false) NOT NULL"`
-	}
+	const TaskTypeMigrateRepo = 0
+	const TaskStatusStopped = 2
 
-	// Add lower_email and is_primary columns
-	if err = x.Table("email_address").Sync2(new(EmailAddress1)); err != nil {
-		return
-	}
+	const batchSize = 100
 
-	if _, err = x.Exec("UPDATE email_address SET lower_email=LOWER(email), is_primary=?", false); err != nil {
-		return
-	}
-
-	type EmailAddress struct {
-		ID          int64  `xorm:"pk autoincr"`
-		UID         int64  `xorm:"INDEX NOT NULL"`
-		Email       string `xorm:"UNIQUE NOT NULL"`
-		LowerEmail  string `xorm:"UNIQUE NOT NULL"`
-		IsActivated bool
-		IsPrimary   bool `xorm:"DEFAULT(false) NOT NULL"`
-	}
-
-	// change lower_email as unique
-	if err = x.Sync2(new(EmailAddress)); err != nil {
-		return
-	}
+	// only match migration tasks, that are not pending or running
+	cond := builder.Eq{
+		"type": TaskTypeMigrateRepo,
+	}.And(builder.Gte{
+		"status": TaskStatusStopped,
+	})
 
 	sess := x.NewSession()
 	defer sess.Close()
 
-	const batchSize = 100
-
 	for start := 0; ; start += batchSize {
-		users := make([]*User, 0, batchSize)
-		if err = sess.Limit(batchSize, start).Find(&users); err != nil {
+		tasks := make([]*Task, 0, batchSize)
+		if err = sess.Limit(batchSize, start).Where(cond, 0).Find(&tasks); err != nil {
 			return
 		}
-		if len(users) == 0 {
+		if len(tasks) == 0 {
 			break
 		}
-
-		for _, user := range users {
-			var exist bool
-			exist, err = sess.Where("email=?", user.Email).Table("email_address").Exist()
-			if err != nil {
+		if err = sess.Begin(); err != nil {
+			return
+		}
+		for _, t := range tasks {
+			if t.PayloadContent, err = removeCredentials(t.PayloadContent); err != nil {
 				return
 			}
-			if !exist {
-				if _, err = sess.Insert(&EmailAddress{
-					UID:         user.ID,
-					Email:       user.Email,
-					LowerEmail:  strings.ToLower(user.Email),
-					IsActivated: user.IsActive,
-					IsPrimary:   true,
-				}); err != nil {
-					return
-				}
-			} else {
-				if _, err = sess.Where("email=?", user.Email).Cols("is_primary").Update(&EmailAddress{
-					IsPrimary: true,
-				}); err != nil {
-					return
-				}
+			if _, err = sess.ID(t.ID).Cols("payload_content").Update(t); err != nil {
+				return
 			}
 		}
+		if err = sess.Commit(); err != nil {
+			return
+		}
+	}
+	return err
+}
+
+func removeCredentials(payload string) (string, error) {
+	// MigrateOptions defines the way a repository gets migrated
+	// this is for internal usage by migrations module and func who interact with it
+	type MigrateOptions struct {
+		// required: true
+		CloneAddr             string `json:"clone_addr" binding:"Required"`
+		CloneAddrEncrypted    string `json:"clone_addr_encrypted,omitempty"`
+		AuthUsername          string `json:"auth_username"`
+		AuthPassword          string `json:"-"`
+		AuthPasswordEncrypted string `json:"auth_password_encrypted,omitempty"`
+		AuthToken             string `json:"-"`
+		AuthTokenEncrypted    string `json:"auth_token_encrypted,omitempty"`
+		// required: true
+		UID int `json:"uid" binding:"Required"`
+		// required: true
+		RepoName        string `json:"repo_name" binding:"Required"`
+		Mirror          bool   `json:"mirror"`
+		LFS             bool   `json:"lfs"`
+		LFSEndpoint     string `json:"lfs_endpoint"`
+		Private         bool   `json:"private"`
+		Description     string `json:"description"`
+		OriginalURL     string
+		GitServiceType  int
+		Wiki            bool
+		Issues          bool
+		Milestones      bool
+		Labels          bool
+		Releases        bool
+		Comments        bool
+		PullRequests    bool
+		ReleaseAssets   bool
+		MigrateToRepoID int64
+		MirrorInterval  string `json:"mirror_interval"`
 	}
 
-	return nil
+	var opts MigrateOptions
+	err := json.Unmarshal([]byte(payload), &opts)
+	if err != nil {
+		return "", err
+	}
+
+	opts.AuthPassword = ""
+	opts.AuthToken = ""
+	opts.CloneAddr = util.SanitizeCredentialURLs(opts.CloneAddr)
+
+	confBytes, err := json.Marshal(opts)
+	if err != nil {
+		return "", err
+	}
+	return string(confBytes), nil
 }

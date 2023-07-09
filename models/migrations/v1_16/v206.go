@@ -4,25 +4,39 @@
 package v1_16 //nolint
 
 import (
-	"fmt"
+	"code.gitea.io/gitea/models/migrations/base"
 
 	"xorm.io/xorm"
+	"xorm.io/xorm/schemas"
 )
 
-func AddAuthorizeColForTeamUnit(x *xorm.Engine) error {
-	type TeamUnit struct {
-		ID         int64 `xorm:"pk autoincr"`
-		OrgID      int64 `xorm:"INDEX"`
-		TeamID     int64 `xorm:"UNIQUE(s)"`
-		Type       int   `xorm:"UNIQUE(s)"`
-		AccessMode int
+func MigrateUserPasswordSalt(x *xorm.Engine) error {
+	dbType := x.Dialect().URI().DBType
+	// For SQLITE, the max length doesn't matter.
+	if dbType == schemas.SQLITE {
+		return nil
 	}
 
-	if err := x.Sync2(new(TeamUnit)); err != nil {
-		return fmt.Errorf("sync2: %w", err)
+	if err := base.ModifyColumn(x, "user", &schemas.Column{
+		Name: "rands",
+		SQLType: schemas.SQLType{
+			Name: "VARCHAR",
+		},
+		Length: 32,
+		// MySQL will like us again.
+		Nullable:       true,
+		DefaultIsEmpty: true,
+	}); err != nil {
+		return err
 	}
 
-	// migrate old permission
-	_, err := x.Exec("UPDATE team_unit SET access_mode = (SELECT authorize FROM team WHERE team.id = team_unit.team_id)")
-	return err
+	return base.ModifyColumn(x, "user", &schemas.Column{
+		Name: "salt",
+		SQLType: schemas.SQLType{
+			Name: "VARCHAR",
+		},
+		Length:         32,
+		Nullable:       true,
+		DefaultIsEmpty: true,
+	})
 }

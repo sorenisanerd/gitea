@@ -3,14 +3,14 @@
 
 package v1_12 //nolint
 
-import (
-	"xorm.io/xorm"
-)
+import "xorm.io/xorm"
 
-func AddRequireSignedCommits(x *xorm.Engine) error {
-	type ProtectedBranch struct {
-		RequireSignedCommits bool `xorm:"NOT NULL DEFAULT false"`
+func AddIsRestricted(x *xorm.Engine) error {
+	// User see models/user.go
+	type User struct {
+		ID           int64 `xorm:"pk autoincr"`
+		IsRestricted bool  `xorm:"NOT NULL DEFAULT false"`
 	}
 
-	return x.Sync2(new(ProtectedBranch))
+	return x.Sync2(new(User))
 }

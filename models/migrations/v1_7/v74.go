@@ -3,13 +3,16 @@
 
 package v1_7 //nolint
 
-import "xorm.io/xorm"
+import (
+	"xorm.io/xorm"
+)
 
-func AddApprovalWhitelistsToProtectedBranches(x *xorm.Engine) error {
-	type ProtectedBranch struct {
-		ApprovalsWhitelistUserIDs []int64 `xorm:"JSON TEXT"`
-		ApprovalsWhitelistTeamIDs []int64 `xorm:"JSON TEXT"`
-		RequiredApprovals         int64   `xorm:"NOT NULL DEFAULT 0"`
+func AddMustChangePassword(x *xorm.Engine) error {
+	// User see models/user.go
+	type User struct {
+		ID                 int64 `xorm:"pk autoincr"`
+		MustChangePassword bool  `xorm:"NOT NULL DEFAULT false"`
 	}
-	return x.Sync2(new(ProtectedBranch))
+
+	return x.Sync2(new(User))
 }

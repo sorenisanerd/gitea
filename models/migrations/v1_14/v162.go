@@ -4,12 +4,14 @@
 package v1_14 //nolint
 
 import (
+	"context"
+
 	"code.gitea.io/gitea/models/migrations/base"
 
 	"xorm.io/xorm"
 )
 
-func ConvertWebhookTaskTypeToString(x *xorm.Engine) error {
+func ConvertTaskTypeToString(x *xorm.Engine) error {
 	const (
 		GOGS int = iota + 1
 		SLACK
@@ -36,15 +38,24 @@ func ConvertWebhookTaskTypeToString(x *xorm.Engine) error {
 		WECHATWORK: "wechatwork",
 	}
 
-	type Webhook struct {
-		Type string `xorm:"char(16) index"`
+	type HookTask struct {
+		Typ string `xorm:"VARCHAR(16) index"`
 	}
-	if err := x.Sync2(new(Webhook)); err != nil {
+	if err := x.Sync2(new(HookTask)); err != nil {
 		return err
 	}
 
+	// to keep the migration could be rerun
+	exist, err := x.Dialect().IsColumnExist(x.DB(), context.Background(), "hook_task", "type")
+	if err != nil {
+		return err
+	}
+	if !exist {
+		return nil
+	}
+
 	for i, s := range hookTaskTypes {
-		if _, err := x.Exec("UPDATE webhook set type = ? where hook_task_type=?", s, i); err != nil {
+		if _, err := x.Exec("UPDATE hook_task set typ = ? where `type`=?", s, i); err != nil {
 			return err
 		}
 	}
@@ -54,7 +65,7 @@ func ConvertWebhookTaskTypeToString(x *xorm.Engine) error {
 	if err := sess.Begin(); err != nil {
 		return err
 	}
-	if err := base.DropTableColumns(sess, "webhook", "hook_task_type"); err != nil {
+	if err := base.DropTableColumns(sess, "hook_task", "type"); err != nil {
 		return err
 	}
 

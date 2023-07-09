@@ -7,19 +7,17 @@ import (
 	"xorm.io/xorm"
 )
 
-// RepoWatchMode specifies what kind of watch the user has on a repository
-type RepoWatchMode int8
-
-// Watch is connection request for receiving repository notification.
-type Watch struct {
-	ID   int64         `xorm:"pk autoincr"`
-	Mode RepoWatchMode `xorm:"SMALLINT NOT NULL DEFAULT 1"`
-}
-
-func AddModeColumnToWatch(x *xorm.Engine) (err error) {
-	if err = x.Sync2(new(Watch)); err != nil {
-		return
+func AddTeamIncludesAllRepositories(x *xorm.Engine) error {
+	type Team struct {
+		ID                      int64 `xorm:"pk autoincr"`
+		IncludesAllRepositories bool  `xorm:"NOT NULL DEFAULT false"`
 	}
-	_, err = x.Exec("UPDATE `watch` SET `mode` = 1")
+
+	if err := x.Sync2(new(Team)); err != nil {
+		return err
+	}
+
+	_, err := x.Exec("UPDATE `team` SET `includes_all_repositories` = ? WHERE `name`=?",
+		true, "Owners")
 	return err
 }

@@ -1,19 +1,21 @@
-// Copyright 2020 The Gitea Authors. All rights reserved.
+// Copyright 2021 The Gitea Authors. All rights reserved.
 // SPDX-License-Identifier: MIT
 
 package v1_14 //nolint
 
 import (
-	"code.gitea.io/gitea/modules/timeutil"
+	"fmt"
 
 	"xorm.io/xorm"
 )
 
-func AddSessionTable(x *xorm.Engine) error {
-	type Session struct {
-		Key    string `xorm:"pk CHAR(16)"`
-		Data   []byte `xorm:"BLOB"`
-		Expiry timeutil.TimeStamp
+func AddSortingColToProjectBoard(x *xorm.Engine) error {
+	type ProjectBoard struct {
+		Sorting int8 `xorm:"NOT NULL DEFAULT 0"`
 	}
-	return x.Sync2(new(Session))
+
+	if err := x.Sync2(new(ProjectBoard)); err != nil {
+		return fmt.Errorf("Sync2: %w", err)
+	}
+	return nil
 }

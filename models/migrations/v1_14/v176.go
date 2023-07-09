@@ -4,73 +4,50 @@
 package v1_14 //nolint
 
 import (
+	"fmt"
+	"regexp"
+
+	"code.gitea.io/gitea/modules/log"
+	"code.gitea.io/gitea/modules/setting"
+
 	"xorm.io/xorm"
 )
 
-// RemoveInvalidLabels looks through the database to look for comments and issue_labels
-// that refer to labels do not belong to the repository or organization that repository
-// that the issue is in
-func RemoveInvalidLabels(x *xorm.Engine) error {
-	type Comment struct {
-		ID      int64 `xorm:"pk autoincr"`
-		Type    int   `xorm:"INDEX"`
-		IssueID int64 `xorm:"INDEX"`
-		LabelID int64
+func FixPostgresIDSequences(x *xorm.Engine) error {
+	if !setting.Database.Type.IsPostgreSQL() {
+		return nil
 	}
 
-	type Issue struct {
-		ID     int64 `xorm:"pk autoincr"`
-		RepoID int64 `xorm:"INDEX UNIQUE(repo_index)"`
-		Index  int64 `xorm:"UNIQUE(repo_index)"` // Index in one repository.
-	}
-
-	type Repository struct {
-		ID        int64  `xorm:"pk autoincr"`
-		OwnerID   int64  `xorm:"UNIQUE(s) index"`
-		LowerName string `xorm:"UNIQUE(s) INDEX NOT NULL"`
-	}
-
-	type Label struct {
-		ID     int64 `xorm:"pk autoincr"`
-		RepoID int64 `xorm:"INDEX"`
-		OrgID  int64 `xorm:"INDEX"`
-	}
-
-	type IssueLabel struct {
-		ID      int64 `xorm:"pk autoincr"`
-		IssueID int64 `xorm:"UNIQUE(s)"`
-		LabelID int64 `xorm:"UNIQUE(s)"`
-	}
-
-	if err := x.Sync2(new(Comment), new(Issue), new(Repository), new(Label), new(IssueLabel)); err != nil {
+	sess := x.NewSession()
+	defer sess.Close()
+	if err := sess.Begin(); err != nil {
 		return err
 	}
 
-	if _, err := x.Exec(`DELETE FROM issue_label WHERE issue_label.id IN (
-		SELECT il_too.id FROM (
-			SELECT il_too_too.id
-				FROM issue_label AS il_too_too
-					INNER JOIN label ON il_too_too.label_id = label.id
-					INNER JOIN issue on issue.id = il_too_too.issue_id
-					INNER JOIN repository on repository.id = issue.repo_id
-				WHERE
-					(label.org_id = 0 AND issue.repo_id != label.repo_id) OR (label.repo_id = 0 AND label.org_id != repository.owner_id)
-	) AS il_too )`); err != nil {
+	var sequences []string
+	schema := sess.Engine().Dialect().URI().Schema
+
+	sess.Engine().SetSchema("")
+	if err := sess.Table("information_schema.sequences").Cols("sequence_name").Where("sequence_name LIKE 'tmp_recreate__%_id_seq%' AND sequence_catalog = ?", setting.Database.Name).Find(&sequences); err != nil {
+		log.Error("Unable to find sequences: %v", err)
 		return err
 	}
+	sess.Engine().SetSchema(schema)
 
-	if _, err := x.Exec(`DELETE FROM comment WHERE comment.id IN (
-		SELECT il_too.id FROM (
-			SELECT com.id
-				FROM comment AS com
-					INNER JOIN label ON com.label_id = label.id
-					INNER JOIN issue on issue.id = com.issue_id
-					INNER JOIN repository on repository.id = issue.repo_id
-				WHERE
-					com.type = ? AND ((label.org_id = 0 AND issue.repo_id != label.repo_id) OR (label.repo_id = 0 AND label.org_id != repository.owner_id))
-	) AS il_too)`, 7); err != nil {
-		return err
+	sequenceRegexp := regexp.MustCompile(`tmp_recreate__(\w+)_id_seq.*`)
+
+	for _, sequence := range sequences {
+		tableName := sequenceRegexp.FindStringSubmatch(sequence)[1]
+		newSequenceName := tableName + "_id_seq"
+		if _, err := sess.Exec(fmt.Sprintf("ALTER SEQUENCE `%s` RENAME TO `%s`", sequence, newSequenceName)); err != nil {
+			log.Error("Unable to rename %s to %s. Error: %v", sequence, newSequenceName, err)
+			return err
+		}
+		if _, err := sess.Exec(fmt.Sprintf("SELECT setval('%s', COALESCE((SELECT MAX(id)+1 FROM `%s`), 1), false)", newSequenceName, tableName)); err != nil {
+			log.Error("Unable to reset sequence %s for %s. Error: %v", newSequenceName, tableName, err)
+			return err
+		}
 	}
 
-	return nil
+	return sess.Commit()
 }

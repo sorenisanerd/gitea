@@ -3,36 +3,14 @@
 
 package v1_10 //nolint
 
-import (
-	"code.gitea.io/gitea/modules/timeutil"
+import "xorm.io/xorm"
 
-	"xorm.io/xorm"
-)
-
-func AddTaskTable(x *xorm.Engine) error {
-	// TaskType defines task type
-	type TaskType int
-
-	// TaskStatus defines task status
-	type TaskStatus int
-
-	type Task struct {
-		ID             int64
-		DoerID         int64 `xorm:"index"` // operator
-		OwnerID        int64 `xorm:"index"` // repo owner id, when creating, the repoID maybe zero
-		RepoID         int64 `xorm:"index"`
-		Type           TaskType
-		Status         TaskStatus `xorm:"index"`
-		StartTime      timeutil.TimeStamp
-		EndTime        timeutil.TimeStamp
-		PayloadContent string             `xorm:"TEXT"`
-		Errors         string             `xorm:"TEXT"` // if task failed, saved the error reason
-		Created        timeutil.TimeStamp `xorm:"created"`
+func AddOriginalAuthorOnMigratedReleases(x *xorm.Engine) error {
+	type Release struct {
+		ID               int64
+		OriginalAuthor   string
+		OriginalAuthorID int64 `xorm:"index"`
 	}
 
-	type Repository struct {
-		Status int `xorm:"NOT NULL DEFAULT 0"`
-	}
-
-	return x.Sync2(new(Task), new(Repository))
+	return x.Sync2(new(Release))
 }

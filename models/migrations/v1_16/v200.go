@@ -3,20 +3,4 @@
 
 package v1_16 //nolint
 
-import (
-	"fmt"
-
-	"xorm.io/xorm"
-)
-
-func AddTableAppState(x *xorm.Engine) error {
-	type AppState struct {
-		ID       string `xorm:"pk varchar(200)"`
-		Revision int64
-		Content  string `xorm:"LONGTEXT"`
-	}
-	if err := x.Sync2(new(AppState)); err != nil {
-		return fmt.Errorf("Sync2: %w", err)
-	}
-	return nil
-}
+// We used to use a table `remote_version` to store information for updater, now we use `AppState`, so this migration task is a no-op now.

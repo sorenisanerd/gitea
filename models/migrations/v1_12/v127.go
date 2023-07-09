@@ -4,41 +4,21 @@
 package v1_12 //nolint
 
 import (
-	"fmt"
-
-	"code.gitea.io/gitea/modules/timeutil"
-
+	"xorm.io/builder"
 	"xorm.io/xorm"
 )
 
-func AddLanguageStats(x *xorm.Engine) error {
-	// LanguageStat see models/repo_language_stats.go
-	type LanguageStat struct {
-		ID          int64 `xorm:"pk autoincr"`
-		RepoID      int64 `xorm:"UNIQUE(s) INDEX NOT NULL"`
-		CommitID    string
-		IsPrimary   bool
-		Language    string             `xorm:"VARCHAR(30) UNIQUE(s) INDEX NOT NULL"`
-		Percentage  float32            `xorm:"NUMERIC(5,2) NOT NULL DEFAULT 0"`
-		Color       string             `xorm:"-"`
-		CreatedUnix timeutil.TimeStamp `xorm:"INDEX CREATED"`
+func FixTopicRepositoryCount(x *xorm.Engine) error {
+	_, err := x.Exec(builder.Delete(builder.NotIn("`repo_id`", builder.Select("`id`").From("`repository`"))).From("`repo_topic`"))
+	if err != nil {
+		return err
 	}
 
-	type RepoIndexerType int
-
-	// RepoIndexerStatus see models/repo_stats_indexer.go
-	type RepoIndexerStatus struct {
-		ID          int64           `xorm:"pk autoincr"`
-		RepoID      int64           `xorm:"INDEX(s)"`
-		CommitSha   string          `xorm:"VARCHAR(40)"`
-		IndexerType RepoIndexerType `xorm:"INDEX(s) NOT NULL DEFAULT 0"`
-	}
-
-	if err := x.Sync2(new(LanguageStat)); err != nil {
-		return fmt.Errorf("Sync2: %w", err)
-	}
-	if err := x.Sync2(new(RepoIndexerStatus)); err != nil {
-		return fmt.Errorf("Sync2: %w", err)
-	}
-	return nil
+	_, err = x.Exec(builder.Update(
+		builder.Eq{
+			"`repo_count`": builder.Select("count(*)").From("`repo_topic`").Where(builder.Eq{
+				"`repo_topic`.`topic_id`": builder.Expr("`topic`.`id`"),
+			}),
+		}).From("`topic`").Where(builder.Eq{"'1'": "1"}))
+	return err
 }

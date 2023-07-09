@@ -4,16 +4,25 @@
 package v1_16 //nolint
 
 import (
-	"code.gitea.io/gitea/models/migrations/base"
+	"code.gitea.io/gitea/modules/setting"
 
 	"xorm.io/xorm"
 )
 
-func RecreateIssueResourceIndexTable(x *xorm.Engine) error {
-	type IssueIndex struct {
-		GroupID  int64 `xorm:"pk"`
-		MaxIndex int64 `xorm:"index"`
+func AlterIssueAndCommentTextFieldsToLongText(x *xorm.Engine) error {
+	sess := x.NewSession()
+	defer sess.Close()
+	if err := sess.Begin(); err != nil {
+		return err
 	}
 
-	return base.RecreateTables(new(IssueIndex))(x)
+	if setting.Database.Type.IsMySQL() {
+		if _, err := sess.Exec("ALTER TABLE `issue` CHANGE `content` `content` LONGTEXT"); err != nil {
+			return err
+		}
+		if _, err := sess.Exec("ALTER TABLE `comment` CHANGE `content` `content` LONGTEXT, CHANGE `patch` `patch` LONGTEXT"); err != nil {
+			return err
+		}
+	}
+	return sess.Commit()
 }

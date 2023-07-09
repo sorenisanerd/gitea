@@ -5,12 +5,30 @@ package v1_10 //nolint
 
 import "xorm.io/xorm"
 
-func ChangeSomeColumnsLengthOfRepo(x *xorm.Engine) error {
+func AddOriginalMigrationInfo(x *xorm.Engine) error {
+	// Issue see models/issue.go
+	type Issue struct {
+		OriginalAuthor   string
+		OriginalAuthorID int64
+	}
+
+	if err := x.Sync2(new(Issue)); err != nil {
+		return err
+	}
+
+	// Issue see models/issue_comment.go
+	type Comment struct {
+		OriginalAuthor   string
+		OriginalAuthorID int64
+	}
+
+	if err := x.Sync2(new(Comment)); err != nil {
+		return err
+	}
+
+	// Issue see models/repo.go
 	type Repository struct {
-		ID          int64  `xorm:"pk autoincr"`
-		Description string `xorm:"TEXT"`
-		Website     string `xorm:"VARCHAR(2048)"`
-		OriginalURL string `xorm:"VARCHAR(2048)"`
+		OriginalURL string
 	}
 
 	return x.Sync2(new(Repository))

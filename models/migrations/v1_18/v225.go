@@ -4,25 +4,24 @@
 package v1_18 //nolint
 
 import (
-	"code.gitea.io/gitea/modules/setting"
-
 	"xorm.io/xorm"
 )
 
-func AlterPublicGPGKeyContentFieldsToMediumText(x *xorm.Engine) error {
-	sess := x.NewSession()
-	defer sess.Close()
-	if err := sess.Begin(); err != nil {
-		return err
+func CreateUserBadgesTable(x *xorm.Engine) error {
+	type Badge struct {
+		ID          int64 `xorm:"pk autoincr"`
+		Description string
+		ImageURL    string
 	}
 
-	if setting.Database.Type.IsMySQL() {
-		if _, err := sess.Exec("ALTER TABLE `gpg_key` CHANGE `content` `content` MEDIUMTEXT"); err != nil {
-			return err
-		}
-		if _, err := sess.Exec("ALTER TABLE `public_key` CHANGE `content` `content` MEDIUMTEXT"); err != nil {
-			return err
-		}
+	type userBadge struct {
+		ID      int64 `xorm:"pk autoincr"`
+		BadgeID int64
+		UserID  int64 `xorm:"INDEX"`
 	}
-	return sess.Commit()
+
+	if err := x.Sync2(new(Badge)); err != nil {
+		return err
+	}
+	return x.Sync2(new(userBadge))
 }

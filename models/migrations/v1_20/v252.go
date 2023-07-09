@@ -9,7 +9,7 @@ import (
 	"xorm.io/xorm"
 )
 
-func FixIncorrectAdminTeamUnitAccessMode(x *xorm.Engine) error {
+func FixIncorrectOwnerTeamUnitAccessMode(x *xorm.Engine) error {
 	type UnitType int
 	type AccessMode int
 
@@ -22,8 +22,8 @@ func FixIncorrectAdminTeamUnitAccessMode(x *xorm.Engine) error {
 	}
 
 	const (
-		// AccessModeAdmin admin access
-		AccessModeAdmin = 3
+		// AccessModeOwner owner access
+		AccessModeOwner = 4
 	)
 
 	sess := x.NewSession()
@@ -34,14 +34,14 @@ func FixIncorrectAdminTeamUnitAccessMode(x *xorm.Engine) error {
 	}
 
 	count, err := sess.Table("team_unit").
-		Where("team_id IN (SELECT id FROM team WHERE authorize = ?)", AccessModeAdmin).
+		Where("team_id IN (SELECT id FROM team WHERE authorize = ?)", AccessModeOwner).
 		Update(&TeamUnit{
-			AccessMode: AccessModeAdmin,
+			AccessMode: AccessModeOwner,
 		})
 	if err != nil {
 		return err
 	}
-	log.Debug("Updated %d admin team unit access mode to belong to admin instead of none", count)
+	log.Debug("Updated %d owner team unit access mode to belong to owner instead of none", count)
 
 	return sess.Commit()
 }

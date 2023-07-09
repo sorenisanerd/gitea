@@ -4,36 +4,21 @@
 package v1_13 //nolint
 
 import (
-	"code.gitea.io/gitea/models/migrations/base"
+	"fmt"
+
 	"code.gitea.io/gitea/modules/timeutil"
 
 	"xorm.io/xorm"
 )
 
-func AddPrimaryKeyToRepoTopic(x *xorm.Engine) error {
-	// Topic represents a topic of repositories
-	type Topic struct {
-		ID          int64  `xorm:"pk autoincr"`
-		Name        string `xorm:"UNIQUE VARCHAR(25)"`
-		RepoCount   int
+func AddCreatedAndUpdatedToMilestones(x *xorm.Engine) error {
+	type Milestone struct {
 		CreatedUnix timeutil.TimeStamp `xorm:"INDEX created"`
 		UpdatedUnix timeutil.TimeStamp `xorm:"INDEX updated"`
 	}
 
-	// RepoTopic represents associated repositories and topics
-	type RepoTopic struct {
-		RepoID  int64 `xorm:"pk"`
-		TopicID int64 `xorm:"pk"`
+	if err := x.Sync2(new(Milestone)); err != nil {
+		return fmt.Errorf("Sync2: %w", err)
 	}
-
-	sess := x.NewSession()
-	defer sess.Close()
-	if err := sess.Begin(); err != nil {
-		return err
-	}
-
-	base.RecreateTable(sess, &Topic{})
-	base.RecreateTable(sess, &RepoTopic{})
-
-	return sess.Commit()
+	return nil
 }

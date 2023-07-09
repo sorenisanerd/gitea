@@ -4,20 +4,13 @@
 package v1_19 //nolint
 
 import (
-	"code.gitea.io/gitea/modules/timeutil"
-
 	"xorm.io/xorm"
 )
 
-func CreateSecretsTable(x *xorm.Engine) error {
-	type Secret struct {
-		ID          int64
-		OwnerID     int64              `xorm:"INDEX UNIQUE(owner_repo_name) NOT NULL"`
-		RepoID      int64              `xorm:"INDEX UNIQUE(owner_repo_name) NOT NULL DEFAULT 0"`
-		Name        string             `xorm:"UNIQUE(owner_repo_name) NOT NULL"`
-		Data        string             `xorm:"LONGTEXT"`
-		CreatedUnix timeutil.TimeStamp `xorm:"created NOT NULL"`
+func AddIndexForAccessToken(x *xorm.Engine) error {
+	type AccessToken struct {
+		TokenLastEight string `xorm:"INDEX token_last_eight"`
 	}
 
-	return x.Sync(new(Secret))
+	return x.Sync(new(AccessToken))
 }

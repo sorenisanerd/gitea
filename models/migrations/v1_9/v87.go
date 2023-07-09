@@ -7,11 +7,10 @@ import (
 	"xorm.io/xorm"
 )
 
-func AddAvatarFieldToRepository(x *xorm.Engine) error {
-	type Repository struct {
-		// ID(10-20)-md5(32) - must fit into 64 symbols
-		Avatar string `xorm:"VARCHAR(64)"`
+func AddHTTPMethodToWebhook(x *xorm.Engine) error {
+	type Webhook struct {
+		HTTPMethod string `xorm:"http_method DEFAULT 'POST'"`
 	}
 
-	return x.Sync2(new(Repository))
+	return x.Sync2(new(Webhook))
 }

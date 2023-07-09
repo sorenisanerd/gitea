@@ -4,18 +4,12 @@
 package v1_12 //nolint
 
 import (
-	"fmt"
-
 	"xorm.io/xorm"
 )
 
-func AddResolveDoerIDCommentColumn(x *xorm.Engine) error {
-	type Comment struct {
-		ResolveDoerID int64
+func AddBlockOnOutdatedBranch(x *xorm.Engine) error {
+	type ProtectedBranch struct {
+		BlockOnOutdatedBranch bool `xorm:"NOT NULL DEFAULT false"`
 	}
-
-	if err := x.Sync2(new(Comment)); err != nil {
-		return fmt.Errorf("Sync2: %w", err)
-	}
-	return nil
+	return x.Sync2(new(ProtectedBranch))
 }

@@ -7,34 +7,47 @@ import (
 	"testing"
 
 	"code.gitea.io/gitea/models/migrations/base"
-	"code.gitea.io/gitea/modules/timeutil"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_DeleteOrphanedIssueLabels(t *testing.T) {
-	// Create the models used in the migration
-	type IssueLabel struct {
-		ID      int64 `xorm:"pk autoincr"`
-		IssueID int64 `xorm:"UNIQUE(s)"`
-		LabelID int64 `xorm:"UNIQUE(s)"`
+func Test_RemoveInvalidLabels(t *testing.T) {
+	// Models used by the migration
+	type Comment struct {
+		ID           int64 `xorm:"pk autoincr"`
+		Type         int   `xorm:"INDEX"`
+		IssueID      int64 `xorm:"INDEX"`
+		LabelID      int64
+		ShouldRemain bool // <- Flag for testing the migration
+	}
+
+	type Issue struct {
+		ID     int64 `xorm:"pk autoincr"`
+		RepoID int64 `xorm:"INDEX UNIQUE(repo_index)"`
+		Index  int64 `xorm:"UNIQUE(repo_index)"` // Index in one repository.
+	}
+
+	type Repository struct {
+		ID        int64  `xorm:"pk autoincr"`
+		OwnerID   int64  `xorm:"UNIQUE(s) index"`
+		LowerName string `xorm:"UNIQUE(s) INDEX NOT NULL"`
 	}
 
 	type Label struct {
-		ID              int64 `xorm:"pk autoincr"`
-		RepoID          int64 `xorm:"INDEX"`
-		OrgID           int64 `xorm:"INDEX"`
-		Name            string
-		Description     string
-		Color           string `xorm:"VARCHAR(7)"`
-		NumIssues       int
-		NumClosedIssues int
-		CreatedUnix     timeutil.TimeStamp `xorm:"INDEX created"`
-		UpdatedUnix     timeutil.TimeStamp `xorm:"INDEX updated"`
+		ID     int64 `xorm:"pk autoincr"`
+		RepoID int64 `xorm:"INDEX"`
+		OrgID  int64 `xorm:"INDEX"`
 	}
 
-	// Prepare and load the testing database
-	x, deferable := base.PrepareTestEnv(t, 0, new(IssueLabel), new(Label))
+	type IssueLabel struct {
+		ID           int64 `xorm:"pk autoincr"`
+		IssueID      int64 `xorm:"UNIQUE(s)"`
+		LabelID      int64 `xorm:"UNIQUE(s)"`
+		ShouldRemain bool  // <- Flag for testing the migration
+	}
+
+	// load and prepare the test database
+	x, deferable := base.PrepareTestEnv(t, 0, new(Comment), new(Issue), new(Repository), new(IssueLabel), new(Label))
 	if x == nil || t.Failed() {
 		defer deferable()
 		return
@@ -42,47 +55,74 @@ func Test_DeleteOrphanedIssueLabels(t *testing.T) {
 	defer deferable()
 
 	var issueLabels []*IssueLabel
-	preMigration := map[int64]*IssueLabel{}
-	postMigration := map[int64]*IssueLabel{}
+	ilPreMigration := map[int64]*IssueLabel{}
+	ilPostMigration := map[int64]*IssueLabel{}
 
-	// Load issue labels that exist in the database pre-migration
+	var comments []*Comment
+	comPreMigration := map[int64]*Comment{}
+	comPostMigration := map[int64]*Comment{}
+
+	// Get pre migration values
 	if err := x.Find(&issueLabels); err != nil {
-		assert.NoError(t, err)
+		t.Errorf("Unable to find issueLabels: %v", err)
 		return
 	}
 	for _, issueLabel := range issueLabels {
-		preMigration[issueLabel.ID] = issueLabel
+		ilPreMigration[issueLabel.ID] = issueLabel
+	}
+	if err := x.Find(&comments); err != nil {
+		t.Errorf("Unable to find comments: %v", err)
+		return
+	}
+	for _, comment := range comments {
+		comPreMigration[comment.ID] = comment
 	}
 
 	// Run the migration
-	if err := DeleteOrphanedIssueLabels(x); err != nil {
-		assert.NoError(t, err)
-		return
+	if err := RemoveInvalidLabels(x); err != nil {
+		t.Errorf("unable to RemoveInvalidLabels: %v", err)
 	}
 
-	// Load the remaining issue-labels
+	// Get the post migration values
 	issueLabels = issueLabels[:0]
 	if err := x.Find(&issueLabels); err != nil {
-		assert.NoError(t, err)
+		t.Errorf("Unable to find issueLabels: %v", err)
 		return
 	}
 	for _, issueLabel := range issueLabels {
-		postMigration[issueLabel.ID] = issueLabel
+		ilPostMigration[issueLabel.ID] = issueLabel
 	}
-
-	// Now test what is left
-	if _, ok := postMigration[2]; ok {
-		t.Errorf("Orphaned Label[2] survived the migration")
+	comments = comments[:0]
+	if err := x.Find(&comments); err != nil {
+		t.Errorf("Unable to find comments: %v", err)
 		return
 	}
-
-	if _, ok := postMigration[5]; ok {
-		t.Errorf("Orphaned Label[5] survived the migration")
-		return
+	for _, comment := range comments {
+		comPostMigration[comment.ID] = comment
 	}
 
-	for id, post := range postMigration {
-		pre := preMigration[id]
-		assert.Equal(t, pre, post, "migration changed issueLabel %d", id)
+	// Finally test results of the migration
+	for id, comment := range comPreMigration {
+		post, ok := comPostMigration[id]
+		if ok {
+			if !comment.ShouldRemain {
+				t.Errorf("Comment[%d] remained but should have been deleted", id)
+			}
+			assert.Equal(t, comment, post)
+		} else if comment.ShouldRemain {
+			t.Errorf("Comment[%d] was deleted but should have remained", id)
+		}
+	}
+
+	for id, il := range ilPreMigration {
+		post, ok := ilPostMigration[id]
+		if ok {
+			if !il.ShouldRemain {
+				t.Errorf("IssueLabel[%d] remained but should have been deleted", id)
+			}
+			assert.Equal(t, il, post)
+		} else if il.ShouldRemain {
+			t.Errorf("IssueLabel[%d] was deleted but should have remained", id)
+		}
 	}
 }

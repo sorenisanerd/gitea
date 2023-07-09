@@ -3,28 +3,14 @@
 
 package v1_8 //nolint
 
-import (
-	"fmt"
+import "xorm.io/xorm"
 
-	"xorm.io/xorm"
-	"xorm.io/xorm/schemas"
-)
-
-func ChangeU2FCounterType(x *xorm.Engine) error {
-	var err error
-
-	switch x.Dialect().URI().DBType {
-	case schemas.MYSQL:
-		_, err = x.Exec("ALTER TABLE `u2f_registration` MODIFY `counter` BIGINT")
-	case schemas.POSTGRES:
-		_, err = x.Exec("ALTER TABLE `u2f_registration` ALTER COLUMN `counter` SET DATA TYPE bigint")
-	case schemas.MSSQL:
-		_, err = x.Exec("ALTER TABLE `u2f_registration` ALTER COLUMN `counter` BIGINT")
+func AddIsLockedToIssues(x *xorm.Engine) error {
+	// Issue see models/issue.go
+	type Issue struct {
+		ID       int64 `xorm:"pk autoincr"`
+		IsLocked bool  `xorm:"NOT NULL DEFAULT false"`
 	}
 
-	if err != nil {
-		return fmt.Errorf("Error changing u2f_registration counter column type: %w", err)
-	}
-
-	return nil
+	return x.Sync2(new(Issue))
 }
